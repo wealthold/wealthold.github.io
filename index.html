@@ -22,6 +22,55 @@
     .inline-options{display:flex;flex-wrap:wrap;gap:var(--space-3) var(--space-4);align-items:center} .check{display:inline-flex;align-items:center;gap:.55rem;padding:.55rem .8rem;background:var(--color-surface-2);border:1px solid var(--color-border);border-radius:var(--radius-full)} .check input{width:18px;height:18px;min-height:auto} .notes{min-height:150px} .status{margin-top:var(--space-4);padding:var(--space-3) var(--space-4);border-radius:var(--radius-md);background:var(--color-surface-2);border:1px solid var(--color-border);font-size:var(--text-sm);color:var(--color-text-muted)} .footer-tools{display:flex;flex-wrap:wrap;gap:var(--space-3);margin-top:var(--space-5)} .divider{height:1px;background:var(--color-divider);margin:var(--space-5) 0} fieldset{border:none;padding:0;margin:0}
     .call-panel[hidden]{display:none!important} .collapsed-note{display:block;margin-bottom:var(--space-4)} .start-state .call-panel{display:none} .start-state .collapsed-note{display:block} .call-live .collapsed-note{display:none}
     @media (max-width:1100px){.layout{grid-template-columns:1fr}.panel{position:static}} @media (max-width:720px){.app-shell{padding:var(--space-4)}.topbar{align-items:flex-start;flex-direction:column}.span-6,.span-4,.span-3,.span-8,.span-12{grid-column:span 12}} @media (prefers-reduced-motion:reduce){*{scroll-behavior:auto;transition:none!important}}
+.print-value{display:none}
+
+@media print{
+  body{
+    background:#fff !important;
+    color:#000 !important;
+  }
+
+  .topbar,
+  .panel{
+    display:none !important;
+  }
+
+  .layout{
+    display:block !important;
+  }
+
+  .form-card,
+  .section{
+    box-shadow:none !important;
+    border:1px solid #ccc !important;
+    background:#fff !important;
+  }
+
+  body.print-mode input,
+  body.print-mode textarea,
+  body.print-mode select{
+    display:none !important;
+  }
+
+  body.print-mode .print-value{
+    display:block !important;
+    min-height:1.2em;
+    padding:.35rem 0;
+    color:#000 !important;
+    white-space:pre-wrap;
+    border-bottom:1px solid #ccc;
+  }
+
+  body.print-mode .check .print-value{
+    border-bottom:none;
+    padding:0;
+  }
+
+  body.print-mode .badge{
+    color:#000 !important;
+    background:#eee !important;
+  }
+}
   </style>
 </head>
 <body>
@@ -244,7 +293,53 @@
       `Exported At: ${data.exportedAt || ''}`
     ].join('\n');
   }
+  function syncPrintValues() {
+    const fields = form.querySelectorAll('input, textarea, select');
 
+    form.querySelectorAll('.print-value').forEach(el => el.remove());
+
+    fields.forEach((field) => {
+      if (field.type === 'radio') {
+        if (!field.checked) return;
+        const group = field.closest('.inline-options') || field.parentElement;
+        if (!group) return;
+        let mirror = group.querySelector('.print-value');
+        if (!mirror) {
+          mirror = document.createElement('div');
+          mirror.className = 'print-value';
+          group.appendChild(mirror);
+        }
+        mirror.textContent = field.value || '';
+        return;
+      }
+
+      const container = field.closest('.field, .stack, .check') || field.parentElement;
+      if (!container) return;
+
+      let mirror = container.querySelector('.print-value');
+      if (!mirror) {
+        mirror = document.createElement('div');
+        mirror.className = 'print-value';
+        container.appendChild(mirror);
+      }
+
+      if (field.type === 'checkbox') {
+        mirror.textContent = field.checked ? 'Yes' : 'No';
+      } else {
+        mirror.textContent = field.value || '';
+      }
+    });
+  }
+
+  function handlePrint() {
+    syncPrintValues();
+    document.body.classList.add('print-mode');
+    window.print();
+  }
+
+  window.addEventListener('afterprint', () => {
+    document.body.classList.remove('print-mode');
+  });
   dobInput.addEventListener('input', updateAgeFromDob);
   document.getElementById('parseBtn').addEventListener('click', () => parseCRMText(crmPaste.value));
   document.getElementById('loadDemoBtn').addEventListener('click', () => { crmPaste.value = `Name: Jordan Matthews\nDOB: 08/12/1991\nAddress: 418 Harbor View Dr, Leland, NC 28451\nPhone: 910-555-0184\nEmail: jordan.matthews@email.com`; statusBox.textContent = 'Demo lead info loaded. Click Auto populate to test.'; });
@@ -252,7 +347,7 @@
   document.getElementById('downloadJsonBtn').addEventListener('click', () => { const data = getFormData(); const name = safeFileName(`${data.name || 'client'}-${data.callOutcome || 'record'}`); downloadFile(`${name}.json`, JSON.stringify(data, null, 2), 'application/json'); statusBox.textContent = 'Client JSON file downloaded.'; });
   document.getElementById('downloadTxtBtn').addEventListener('click', () => { const data = getFormData(); const name = safeFileName(`${data.name || 'client'}-${data.callOutcome || 'summary'}`); downloadFile(`${name}.txt`, buildSummaryText(data), 'text/plain'); statusBox.textContent = 'Client summary text file downloaded.'; });
   document.getElementById('clearFormBtn').addEventListener('click', () => { form.reset(); crmPaste.value = ''; ageInput.value = ''; toggleCallMode(false); statusBox.textContent = 'Form cleared and ready for the next lead.'; });
-  document.getElementById('printBtn').addEventListener('click', () => window.print());
+  document.getElementById('printBtn').addEventListener('click', handlePrint);
 })();
 </script>
 </body>
